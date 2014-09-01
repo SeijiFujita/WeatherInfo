@@ -1033,6 +1033,48 @@ void cw_Delay(int msec = 3000)
 {
 	SDL_Delay(msec);
 }
+
+int MsgBox(string title, string msg)
+{
+	// sdl bug? : do not show buttons, message / do not system modal
+	string[] btnString = ["OK", "Cancel"];
+	return showMessageBox(msg, title, btnString);
+}
+
+int showMessageBox(string msg, string title, string[] buttons, int defbutton = 0)
+{
+	//Variables.
+	SDL_MessageBoxData mbdata;
+	//Set the message box information.
+	mbdata.flags = SDL_MESSAGEBOX_INFORMATION;
+	mbdata.message = toStringz(msg);
+	mbdata.title = toStringz(title);
+	mbdata.colorScheme = null;
+	mbdata.window = g_window;
+	mbdata.numbuttons = buttons.length;
+	
+	//Allocate buttons.
+	SDL_MessageBoxButtonData[] btnArray = new SDL_MessageBoxButtonData[buttons.length];
+//	btnArray.length = buttons.length;
+	
+	//Set the button values.
+	foreach (i, v; btnArray) {
+		v.text = toStringz(buttons[i]);
+        v.buttonid = i;
+		v.flags = 0;
+		//Is this button the default button?
+		if(i == defbutton) {
+			v.flags = SDL_MESSAGEBOX_BUTTON_RETURNKEY_DEFAULT;
+		}
+	}
+    //Set the message box data's button array.
+    mbdata.buttons = btnArray.ptr;
+    //Display the message box.
+	int resultButton = 0;
+    int retval = SDL_ShowMessageBox(&mbdata, &resultButton);
+    //Return the result (-1 on failure or if the dialog was closed).
+    return retval < 0 ? -1 : resultButton;
+}
 //@----------------------------------------------------------------------------
 // widgets
 import std.file;
@@ -1050,33 +1092,49 @@ private:
 	int		_objID = 0;
 }
 
-struct wcOsize
+
+struct wcRect
 {
-	int 	_x1pos;
-	int 	_y1pos;
-	int 	_x2pos;
-	int 	_y2pos;
+	int 	_x1; // start Rectangle x point
+	int 	_y1; // start Rectangle y point
+	int 	_x2; // end Rectangle x point
+	int 	_y2; // end Rectangle y point
 	
-	int 	_width;
-	int 	_height;
+	int 	_width;	// 
+	int 	_height; // 
 	
 	int		_xcenter;
 	int 	_ycenter;
 	
-	void setPos(int x, int y)
+	void setStartXY(int x, int y)
 	{
-		_x1pos = x;
-		_y1pos = y;
+		_x1 = x;
+		_y1 = y;
 	}
-	void setWidthHeight(int w, int h)
+	void setWH(int w, int h)
 	{
 		_width  = w;
 		_height = h;
-		_x2pos  = _x1pos + w;
-		_y2pos  = _y1pos + h;
 		
-		_xcenter = _x1pos + (w /2);
-		_ycenter = _y1pos + (h /2);
+		_x2 = _x1 + w;
+		_y2 = _y1 + h;
+		
+		_xcenter = _x1 + (w /2);
+		_ycenter = _y1 + (h /2);
+	}
+	void setEndXY(int x2, int y2)
+	{
+		setWH(x2 - _x1, y2 - _y1);
+	}
+	void setRectWH(int x1, int y1, int w, int h)
+	{
+		setStartXY(x1, y1);
+		setWH(w, h);
+	}
+	void setRectXY(int x1, int y1, int x2, int y2)
+	{
+		setStartXY(x1, y1);
+		setWH(x2 - _x1, y2 - _y1);
 	}
 }
 
@@ -1151,7 +1209,6 @@ class wcImage : wcObject
 		setWidthHeight();
 	}
 }
-
 
 enum ButtonStat
 {
@@ -1352,34 +1409,34 @@ public:
 	}
 }
 
+struct wcColor
+{
+	SDL_Color	titleBar 		= {200, 200, 200};
+	SDL_Color	frameBar 		= {200, 200, 200};
+	SDL_Color	frameShadow 	= {100, 100, 100};
+	SDL_Color	clientBackGround = {240, 240, 240};
+	SDL_Color	clienFrameShadow = {100, 100, 100};
+	SDL_Color	clienText 		= {50, 50, 50};
+}
 
 // 背景にWindow っぽい絵の表示を行います。
-class cWindow
+class wcWindow
 {
 private:
 	// textString and image
-	wcString 	windowTitle;
-	wcObject[] 	clientObjct;
+	wcString 	windowTitle;	// window title text string
+	wcObject[] 	clientText;		// client text string
 	
-	// window size
-	int 	Width;
-	int 	Height;
-	int 	Xpos;
-	int 	Ypos;
+	wcRect 		fRect;	// window frame
+	wcRect 		cRect;	// window client
 	
 	// inner windows
 	int titleBarHeight = 30;
 	int windowFrameSize = 3;
 	
 	// Color
-	SDL_Color	winClientColor = {240, 240, 240};
-	SDL_Color	FrameColor     = {200, 200, 200};
-	SDL_Color	FrameShadow    = {100, 100, 100};
+	wcColor 	c;
 	
-	int client_LeftX;
-	int client_RightX;
-	int client_TopY;
-	int client_BottmY;
 /++	
     client_LeftX / client_RightX
 	+---------------------------+
@@ -1391,36 +1448,29 @@ private:
 ++/	
 	void setClientPos()
 	{
-		client_LeftX = Xpos + 3;
-		client_RightX = Xpos + Width - 3;
-		client_TopY = Ypos + titleBarHeight;
-		client_BottmY = Ypos + Height - 3;
+		cRect.setStartXY(fRect._x1 + windowFrameSize, fRect._y1 + titleBarHeight);
+		cRect.setEndXY(fRect._x2 - windowFrameSize, fRect._y2 - windowFrameSize);
 	}
 	void drawWindow()
 	{
-		// client
-//		int TopXleft  = Xpos;
-		int TopXright = Xpos + Width;
-		int BottomYpos = Ypos + Height;
-		
-		
-		drawFillRect(Xpos, Ypos, TopXright, BottomYpos, winClientColor);
+		// window Rect
+		drawFillRect(fRect._x1, fRect._y1, fRect._x2, fRect._y2, c.clientBackGround);
 		// title bar
-		drawFillRect(Xpos, Ypos, TopXright, client_TopY, FrameColor);
-		drawLine(client_LeftX, client_TopY, client_RightX, client_TopY, FrameShadow);
+		drawFillRect(fRect._x1, fRect._y1, fRect._x2, cRect._y1, c.titleBar);
+		drawLine(cRect._x1, cRect._y1, cRect._x2, cRect._y1, c.frameShadow);
 		
 		// frame and shadow
 		// left Vertical line
-		drawFillRect(Xpos, Ypos, client_LeftX, client_BottmY, FrameColor);
-		drawLine(client_LeftX, client_TopY, client_LeftX, client_BottmY, FrameShadow);
+		drawFillRect(fRect._x1, fRect._y1, cRect._x1, cRect._y2, c.frameBar);
+		drawLine(cRect._x1, cRect._y1, cRect._x1, cRect._y2, c.frameShadow);
 		
 		// Right Vertical line
-		drawFillRect(client_RightX, Ypos, TopXright, BottomYpos, FrameColor);
-		drawLine(client_RightX, client_TopY, client_RightX, client_BottmY, FrameShadow);
+		drawFillRect(cRect._x2, fRect._y1, fRect._x2, fRect._y2, c.frameBar);
+		drawLine(cRect._x2, cRect._y1, cRect._x2, cRect._y2, c.frameShadow);
 		
 		// Bottom Horizontal line
-		drawFillRect(Xpos, client_BottmY, TopXright, BottomYpos, FrameColor);
-		drawLine(client_LeftX, client_BottmY, client_RightX, client_BottmY, FrameShadow);
+		drawFillRect(fRect._x1, cRect._y2, fRect._x2, fRect._y2, c.frameBar);
+		drawLine(cRect._x1, cRect._y2, cRect._x2, cRect._y2, c.frameShadow);
 	}
 
 public:
@@ -1445,38 +1495,31 @@ public:
 	{
 		createWindow(title, width, height, x1, y1);
 	}
-	
 	void createWindow(int width, int height, int x1, int y1)
 	{
-		Xpos = x1;
-		Ypos = y1;
-		Width = width;
-		Height = height;
+		fRect.setRectWH(x1, y1, width, height);
 		setClientPos();
 	}
 	void createWindow(string title, int width, int height, int x1, int y1)
 	{
-		Xpos = x1;
-		Ypos = y1;
-		Width = width;
-		Height = height;
+		fRect.setRectWH(x1, y1, width, height);
 		setClientPos();
-		windowTitle = new wcString(title, Xpos + 10, Ypos + 6);
+		windowTitle = new wcString(title, x1 + 10, y1 + 6);
 	}
 	void setWindowTitle(string title)
 	{
 		if (windowTitle !is null)
 			delete windowTitle;
 		
-		windowTitle = new wcString(title, Xpos + 10, Ypos + 6);
+		windowTitle = new wcString(title, fRect._x1 + 10, fRect._y1 + 6);
 	}
-//-----------------------------------------------
+//@-----------------------------------------------
 	int client_lastX = 0;
 	int client_lastY = 0;
 	
 	void client_setYPos(int y1)
 	{
-		client_lastY = client_TopY + y1;
+		client_lastY = cRect._y1 + y1;
 	}
 	void client_addYPos(int offset)
 	{
@@ -1484,9 +1527,9 @@ public:
 	}
 	void client_addText(string data, int offsetX = -1, int offsetY = -1)
 	{
-		if (clientObjct.length == 0) {
-			client_lastX = client_LeftX + 10;
-			client_lastY = client_TopY + 10;
+		if (clientText.length == 0) {
+			client_lastX = cRect._x1 + 10;
+			client_lastY = cRect._y1 + 10;
 		}
 		if (!(offsetX == -1 && offsetY == -1)) {
 			// offsetX,offsetY が-1 以外ならば位置を設定
@@ -1495,7 +1538,7 @@ public:
 		}
 		
 		auto wc = new wcString(data, client_lastX, client_lastY);
-		clientObjct ~= wc;
+		clientText ~= wc;
 		
 		if (offsetX == -1 && offsetY == -1) {
 			// offsetX,offsetY が-1 ならば改行する
@@ -1505,9 +1548,9 @@ public:
 	}
 	void client_addImage(string imagePath, int offsetX = -1, int offsetY = -1)
 	{
-		if (clientObjct.length == 0) {
-			client_lastX = client_LeftX + 10;
-			client_lastY = client_TopY + 10;
+		if (clientText.length == 0) {
+			client_lastX = cRect._x1 + 10;
+			client_lastY = cRect._y1 + 10;
 		}
 		if (!(offsetX == -1 && offsetY == -1)) {
 			// offsetX,offsetY が-1 以外ならば位置を設定
@@ -1516,7 +1559,7 @@ public:
 		}
 		
 		auto wc = new wcImage(imagePath, client_lastX, client_lastY);
-		clientObjct ~= wc;
+		clientText ~= wc;
 		
 		if (offsetX == -1 && offsetY == -1) {
 			// offsetX,offsetY が-1 ならば改行する
@@ -1526,21 +1569,21 @@ public:
 	}
 	void client_addText(string[] data)
 	{
-		if (clientObjct.length == 0) {
-			client_lastX = client_LeftX + 10;
-			client_lastY = client_TopY  + 10;
+		if (clientText.length == 0) {
+			client_lastX = cRect._x1 + 10;
+			client_lastY = cRect._y1 + 10;
 		}
 		foreach (v ; data) {
 			if (v.length) {
 				auto wc = new wcString(v, client_lastX, client_lastY);
-				clientObjct ~= wc;
+				clientText ~= wc;
 				client_lastY += wc.getHeight();
 			}
 			else { // 改行が有ったばあい
-				if (clientObjct.length > 1) {
+				if (clientText.length > 1) {
 					// 先頭に改行がある場合は改行しないです
-					if (clientObjct[$ - 1] !is null) {
-						wcObject wt = clientObjct[$ - 1];
+					if (clientText[$ - 1] !is null) {
+						wcObject wt = clientText[$ - 1];
 						client_lastY += wt.getHeight();
 					}
 				}
@@ -1554,11 +1597,25 @@ public:
 		if (windowTitle !is null) {
 			windowTitle.draw();
 		}
-		if (clientObjct.length > 0) {
-			foreach (v ; clientObjct)
+		if (clientText.length > 0) {
+			foreach (v ; clientText)
 				v.draw();
 		}
 	}
 }
-
+/++
+class msgBox : wcWindow
+{
+	wcRect	screen;
+	
+	this(string title, string msg)
+	{
+		screen.setRectXY(0, 0, g_width, g_height);
+		
+		int width  = 
+		int height = 
+		createWindow(string title, int width, int height, int x1, int y1);
+	}
+}
+++/
 //eof

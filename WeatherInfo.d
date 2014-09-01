@@ -37,18 +37,18 @@ enum LeftPainWidth = 200;
 enum RightPainWidth = Window_WIDTH - LeftPainWidth - 20;
 
 
-cWindow[] makeWin()
+wcWindow[] makeWin()
 {
-	cWindow[] Result;
+	wcWindow[] Result;
 	auto tdata = new WeatherHack(TokyoCode);
 //	auto tdata = new WeatherHack(HakodateCode);
 //	auto tdata = new WeatherHack(NahaCode);
 	
-	cWindow rightPain = new cWindow(tdata.description_publicTime, 570, 580, 220, 10);
+	auto rightPain = new wcWindow(tdata.description_publicTime, 570, 580, 220, 10);
 	rightPain.client_addText(splitLines(tdata.description_text));
 	Result ~= rightPain;
 	
-	cWindow leftPain = new cWindow(tdata.title, 200, 540, 10, 10);
+	auto leftPain = new wcWindow(tdata.title, 200, 540, 10, 10);
 	Result ~= leftPain;
 	
 	outLog("tdata.fcs.length =", tdata.fcs.length);
@@ -82,8 +82,6 @@ cWindow[] makeWin()
 	return Result;
 }
 
-
-
 class uiMgr
 {
 private:
@@ -93,12 +91,13 @@ private:
 		loopQuit = false;
 	}
 	void Settings() {
+		MsgBox("*under construction*", "I thinking about the UI...");
 		// UI を考え中... I thinking about the UI 
 	}
 	
 	void startMessage()
 	{
-		auto msg = new cWindow("Start", 400, 100, 200, 200);
+		auto msg = new wcWindow("Start", 400, 100, 200, 200);
 		msg.client_addText("データ受信中.../Receiving the weather data...");
 		clear();
 		msg.draw();
@@ -113,7 +112,7 @@ public:
 	void mainLoop()
 	{
 		startMessage();
-		cWindow[] win = makeWin();
+		wcWindow[] win = makeWin();
 		wcButton btnSetting = new wcButton(110, Window_HEIGHT -45, "設定", "settingIcon.png");
 		btnSetting.onClick = &Settings;
 		wcButton btnQuit = new wcButton(10, Window_HEIGHT -45, "終了");
@@ -139,7 +138,6 @@ int main()
 {
 	try {
 		setDebugLog();
-		
 		auto ui = new uiMgr;
 		ui.mainLoop();
 	}
