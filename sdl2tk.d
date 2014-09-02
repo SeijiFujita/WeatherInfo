@@ -101,9 +101,11 @@ bool wait(uint ms)
 	while (SDL_PollEvent(&e)) {
 		g_quit = (e.type == SDL_QUIT);
 	}
+	if (isPushKey(SDL_SCANCODE_F12)) {
+		saveScreenshot();
+	}
 	if (isPressKey(SDL_SCANCODE_ESCAPE/* SDLK_ESCAPE */ )) {
 		g_quit = true;
-		// 
 		throw new Exception("quit.[ESC-Key or SDL_QUIT]");
 	}
 	return g_quit;
@@ -835,9 +837,9 @@ static bool[SDLK_LAST] g_pressKeyButtonPrev;
 static bool[SDLK_LAST] g_pressKeyButton;
 
 enum : int {
-	RETURN_KEY = SDL_SCANCODE_RETURN, // SDLK_RETURN,
-	ESCAPE_KEY = SDL_SCANCODE_ESCAPE, // SDLK_ESCAPE,
-	SPACE_KEY  = SDL_SCANCODE_SPACE, // SDLK_SPACE,
+	KEY_RETURN = SDL_SCANCODE_RETURN, // 40,
+	KEY_ESCAPE = SDL_SCANCODE_ESCAPE, // 41,
+	KEY_SPACE  = SDL_SCANCODE_SPACE, // 42,
 	KEY_A      = SDL_SCANCODE_A, // SDLK_,
 	KEY_B      = SDL_SCANCODE_B, // SDLK_,
 	KEY_C      = SDL_SCANCODE_C, // SDLK_,
@@ -845,6 +847,20 @@ enum : int {
 	KEY_S      = SDL_SCANCODE_S, // SDLK_,
 	KEY_X      = SDL_SCANCODE_X, // SDLK_x,
 	KEY_Z      = SDL_SCANCODE_Z, // SDLK_z,
+	
+	KEY_F1      = SDL_SCANCODE_F1, // = 58,
+	KEY_F2      = SDL_SCANCODE_F2, // = 59,
+	KEY_F3      = SDL_SCANCODE_F3, // = 60,
+	KEY_F4      = SDL_SCANCODE_F4, // = 61,
+	KEY_F5      = SDL_SCANCODE_F5, // = 62,
+	KEY_F6      = SDL_SCANCODE_F6, // = 63,
+	KEY_F7      = SDL_SCANCODE_F7, // = 64,
+	KEY_F8      = SDL_SCANCODE_F8, // = 65,
+	KEY_F9      = SDL_SCANCODE_F9, // = 66,
+	KEY_F10     = SDL_SCANCODE_F10, // = 67,
+	KEY_F11     = SDL_SCANCODE_F11, // = 68,
+	KEY_F12     = SDL_SCANCODE_F12, // = 69,
+	
 	KEY_UP     = SDL_SCANCODE_UP, // SDLK_UP,
 	KEY_DOWN   = SDL_SCANCODE_DOWN, // SDLK_DOWN,
 	KEY_RIGHT  = SDL_SCANCODE_RIGHT, // SDLK_RIGHT,
@@ -938,8 +954,8 @@ bool isPushKey(int id)
 bool isPressEnter()
 {
 	if (isPressKey(KEY_Z)) 		{ return true; }
-	if (isPressKey(RETURN_KEY))	{ return true; }
-	if (isPressKey(SPACE_KEY))		{ return true; }
+	if (isPressKey(KEY_RETURN))	{ return true; }
+	if (isPressKey(KEY_SPACE))		{ return true; }
 	if (isPressMouse() & MOUSE_BUTTON_LEFT) { return true; }
 	return false;
 }
@@ -947,8 +963,8 @@ bool isPressEnter()
 bool isPushEnter()
 {
 	if (isPushKey(KEY_Z)) 	 { return true; }
-	if (isPushKey(RETURN_KEY)) 	{ return true; }
-	if (isPushKey(SPACE_KEY)) 		{ return true; }
+	if (isPushKey(KEY_RETURN)) 	{ return true; }
+	if (isPushKey(KEY_SPACE)) 		{ return true; }
 	if (isPushMouse() & MOUSE_BUTTON_LEFT) { return true; }
 	return false;
 }
@@ -1032,6 +1048,45 @@ bool isPushRight()
 void cw_Delay(int msec = 3000)
 {
 	SDL_Delay(msec);
+}
+
+void saveScreenshotBMP(string saveFilePath)
+{
+	SDL_Surface* isf = SDL_GetWindowSurface(g_window);
+	if (isf == null) {
+		throw new Exception("saveScreenshotBMP: Failed to create info surface from window");
+	}
+	else {
+		// allocate pixel buffer
+		scope ubyte[] pixels = new ubyte[isf.w * isf.h * isf.format.BytesPerPixel];
+		if (pixels.length == 0) {
+			throw new Exception("saveScreenshotBMP: Unable to allocate memory for screenshot pixel data buffer!");
+		}
+		// Render to pixel.
+//		int result = SDL_RenderReadPixels(g_renderer, isf.clip_rect.ptr, isf.format.format, pixels, isf.w * isf.format.BytesPerPixel)
+		
+		int result = SDL_RenderReadPixels(g_renderer, cast(SDL_Rect*)null,
+			isf.format.format, cast(void*)pixels, isf.w * isf.format.BytesPerPixel);
+		if (result != 0) {
+ 			throw new Exception("saveScreenshotBMP: Failed to read pixel data from SDL_Renderer object.");
+		} else {
+			SDL_Surface* saveSurface = 
+				SDL_CreateRGBSurfaceFrom(cast(void*)pixels, isf.w, isf.h,
+					cast(int)isf.format.BitsPerPixel, isf.w * isf.format.BytesPerPixel,
+					isf.format.Rmask, isf.format.Gmask, isf.format.Bmask, isf.format.Amask);
+			if (saveSurface is null) {
+	 			throw new Exception("Couldn't create SDL_Surface from renderer pixel data.");
+			}
+			SDL_SaveBMP(saveSurface, toStringz(saveFilePath));
+			SDL_FreeSurface(saveSurface);
+		}
+	}
+	SDL_FreeSurface(isf);
+}
+
+void saveScreenshot()
+{
+	saveScreenshotBMP("screenShot.bmp");
 }
 
 int MsgBox(string title, string msg)
