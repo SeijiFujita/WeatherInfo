@@ -31,11 +31,10 @@ enum Window_TITLE = "天気予報";
 // window とwindow の間の隙間
 enum PainXtop      = 10;
 enum PainYtop      = 10;
-enum PainHeight    = Window_HEIGHT - 20;
-
+enum PainHeight    = Window_HEIGHT - PainYtop *2;
 enum LeftPainWidth = 200;
-enum RightPainWidth = Window_WIDTH - LeftPainWidth - 20;
-
+enum RightPainWidth= Window_WIDTH - LeftPainWidth - PainXtop *3;
+enum RightPainXpos  = LeftPainWidth + PainXtop*2;
 
 wcWindow[] makeWin()
 {
@@ -44,40 +43,22 @@ wcWindow[] makeWin()
 //	auto tdata = new WeatherHack(HakodateCode);
 //	auto tdata = new WeatherHack(NahaCode);
 	
-	auto rightPain = new wcWindow(tdata.description_publicTime, 570, 580, 220, 10);
+	auto rightPain = 
+		new wcWindow(tdata.description_publicTime, RightPainWidth, PainHeight, RightPainXpos, PainYtop);
 	rightPain.client_addText(splitLines(tdata.description_text));
 	Result ~= rightPain;
 	
-	auto leftPain = new wcWindow(tdata.title, 200, 540, 10, 10);
+	auto leftPain = new wcWindow(tdata.title, LeftPainWidth, PainHeight - 40, PainXtop, PainYtop);
 	Result ~= leftPain;
 	
 	outLog("tdata.fcs.length =", tdata.fcs.length);
-	if (tdata.fcs.length > 0) {
-//		leftPain.setYpos();
-		string temp = tdata.fcs[0].dateLabel ~ "(" ~ tdata.fcs[0].date ~ ")";
-		leftPain.client_addText(temp);
-		leftPain.client_addImage(forcastImageGif[0]);
-		leftPain.client_addText(tdata.fcs[0].image_title);
-		temp = "(" ~ tdata.fcs[0].temperature_max_celsius ~ "℃/" ~ tdata.fcs[0].temperature_min_celsius ~ "℃)";
-		leftPain.client_addText(temp);
-	}
-	if (tdata.fcs.length > 1) {
-		leftPain.client_addYPos(50);
-		string temp = tdata.fcs[1].dateLabel ~ "(" ~ tdata.fcs[1].date ~ ")";
-		leftPain.client_addText(temp);
-		leftPain.client_addImage(forcastImageGif[1]);
-		leftPain.client_addText(tdata.fcs[1].image_title);
-		temp = "(" ~ tdata.fcs[1].temperature_max_celsius ~ "℃/" ~ tdata.fcs[1].temperature_min_celsius ~ "℃)";
-		leftPain.client_addText(temp);
-	}
-	if (tdata.fcs.length > 2) {
-		leftPain.client_addYPos(50);
-		string temp = tdata.fcs[2].dateLabel ~ "(" ~ tdata.fcs[2].date ~ ")";
-		leftPain.client_addText(temp);
-		leftPain.client_addImage(forcastImageGif[2]);
-		leftPain.client_addText(tdata.fcs[2].image_title);
-		temp = "(" ~ tdata.fcs[2].temperature_max_celsius ~ "℃/" ~ tdata.fcs[2].temperature_min_celsius ~ "℃)";
-		leftPain.client_addText(temp);
+	foreach (i, v ; tdata.fcs) {
+		if (i >= 1)
+			leftPain.client_addYPos(50);
+		leftPain.client_addText(v.dateLabel ~ "(" ~ v.date ~ ")");
+		leftPain.client_addImage(forcastImageGif[i]);
+		leftPain.client_addText(v.image_title);
+		leftPain.client_addText("(" ~ v.temperature_max_celsius ~ "℃/" ~ v.temperature_min_celsius ~ "℃)");
 	}
 	return Result;
 }
